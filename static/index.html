@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Analyzer & ATS Optimizer</title>
+    <!-- Google Fonts: Outfit (headings) & Inter (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #08090d;
+            --bg-darker: #040507;
+            --panel-bg: rgba(18, 20, 32, 0.55);
+            --panel-bg-hover: rgba(25d5, 255, 255, 0.04);
+            --border-color: rgba(255, 255, 255, 0.07);
+            --border-glow: rgba(99, 102, 241, 0.2);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --primary: #6366f1; /* Indigo */
+            --secondary: #06b6d4; /* Cyan */
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+            --accent-gradient-hover: linear-gradient(135deg, #4f46e5 0%, #0891b2 100%);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --font-outfit: 'Outfit', 'Inter', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-inter);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient Background Blur Glows */
+        .bg-glow-1 {
+            position: absolute;
+            top: -10%;
+            left: 10%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+            filter: blur(100px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .bg-glow-2 {
+            position: absolute;
+            bottom: 10%;
+            right: 5%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+            filter: blur(100px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Authentication Screen Styles */
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .auth-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 440px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-header h1 {
+            font-family: var(--font-outfit);
+            font-weight: 800;
+            font-size: 2.2rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .auth-header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            font-family: var(--font-inter);
+            font-size: 1rem;
+            transition: var(--transition-smooth);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn {
+            width: 100%;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            color: white;
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background: var(--accent-gradient-hover);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .auth-toggle a {
+            color: var(--secondary);
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .auth-toggle a:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #ff8b8b;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            display: none;
+            text-align: center;
+        }
+
+        /* Dashboard Screen Styles */
+        .dashboard-container {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        /* Top Header Navigation */
+        .top-navbar {
+            background: rgba(18, 20, 32, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+
+        .brand h2 {
+            font-family: var(--font-outfit);
+            font-weight: 800;
+            font-size: 1.5rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .username-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+        }
+
+        /* Dashboard Workspace Layout */
+        .workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar: Upload Zone & Resume List */
+        .sidebar {
+            width: 320px;
+            background: rgba(12, 14, 24, 0.4);
+            border-right: 1px solid var(--border-color);
+            padding: 25px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            overflow-y: auto;
+        }
+
+        /* Upload Area */
+        .upload-section h3 {
+            font-family: var(--font-outfit);
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dropzone {
+            border: 2px dashed rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 25px 15px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.01);
+            transition: var(--transition-smooth);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dropzone:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.03);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.05);
+        }
+
+        .dropzone svg {
+            width: 42px;
+            height: 42px;
+            color: var(--text-secondary);
+            transition: var(--transition-smooth);
+        }
+
+        .dropzone:hover svg {
+            color: var(--secondary);
+            transform: translateY(-3px);
+        }
+
+        .dropzone p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .dropzone span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Resume List section */
+        .resumes-list-section {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .resumes-list-section h3 {
+            font-family: var(--font-outfit);
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .resume-items-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            max-height: 380px;
+            padding-right: 5px;
+        }
+
+        .resume-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            gap: 10px;
+        }
+
+        .resume-item:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.04);
+            transform: translateX(2px);
+        }
+
+        .resume-item.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+        }
+
+        .resume-item-details {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .resume-item-icon {
+            color: var(--primary);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .resume-item.active .resume-item-icon {
+            color: var(--secondary);
+        }
+
+        .resume-info {
+            overflow: hidden;
+        }
+
+        .resume-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .resume-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .resume-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .resume-badge.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .resume-badge.danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .delete-resume-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            padding: 4px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .delete-resume-btn:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Empty list state */
+        .empty-resumes {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 30px 10px;
+            border: 1px dashed rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        /* Main Display Panel */
+        .main-panel {
+            flex: 1;
+            background: var(--bg-darker);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* No selected resume state */
+        .no-selection-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 40px;
+            text-align: center;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .no-selection-panel svg {
+            width: 80px;
+            height: 80px;
+            color: rgba(99, 102, 241, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .no-selection-panel h2 {
+            font-family: var(--font-outfit);
+            font-weight: 700;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .no-selection-panel p {
+            color: var(--text-secondary);
+            max-width: 480px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Main Selected Workspace */
+        .selected-workspace {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Workspace Header */
+        .workspace-header {
+            background: rgba(18, 20, 32, 0.3);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .active-resume-title h3 {
+            font-family: var(--font-outfit);
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Workspace Tabs */
+        .tabs-nav {
+            display: flex;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 16px;
+            color: var(--text-secondary);
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-gradient);
+            color: white;
+        }
+
+        /* Tab Content Panel */
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* TAB 1: ATS Audit Layout */
+        .ats-audit-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        /* Score Meter Card */
+        .score-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .score-card h4 {
+            font-family: var(--font-outfit);
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* SVG Circular Gauge */
+        .gauge-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin-bottom: 20px;
+        }
+
+        .gauge-svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.03);
+            stroke-width: 12;
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke: url(#gauge-gradient);
+            stroke-width: 12;
+            stroke-dasharray: 502; /* 2 * PI * r (r=80) = 502.6 */
+            stroke-dashoffset: 502;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gauge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .gauge-val {
+            font-family: var(--font-outfit);
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .gauge-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
+
+        .score-status {
+            font-family: var(--font-outfit);
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-top: 10px;
+        }
+
+        /* Recommendations & Career Layout */
+        .feedback-container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* Career recommendations card */
+        .career-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .career-card h4 {
+            font-family: var(--font-outfit);
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .career-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            list-style: none;
+        }
+
+        .career-item {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: var(--font-outfit);
+            transition: var(--transition-smooth);
+        }
+
+        .career-item:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.35);
+            transform: translateY(-1px);
+        }
+
+        /* Review Audit feedback groups */
+        .feedback-sections {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+
+        @media (min-width: 1024px) {
+            .feedback-sections {
+                grid-template-columns: 1fr 1fr;
+            }
+            .full-width-section {
+                grid-column: span 2;
+            }
+        }
+
+        .audit-group {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .audit-group.success-group {
+            border-left: 4px solid var(--success);
+        }
+
+        .audit-group.danger-group {
+            border-left: 4px solid var(--danger);
+        }
+
+        .audit-group.warning-group {
+            border-left: 4px solid var(--warning);
+        }
+
+        .audit-group h4 {
+            font-family: var(--font-outfit);
+            font-size: 1.1rem;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .audit-group.success-group h4 { color: var(--success); }
+        .audit-group.danger-group h4 { color: var(--danger); }
+        .audit-group.warning-group h4 { color: var(--warning); }
+
+        .audit-items {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .audit-item-detail {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            position: relative;
+            padding-left: 24px;
+        }
+
+        .audit-item-detail::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .success-group .audit-item-detail::before { background-color: var(--success); }
+        .danger-group .audit-item-detail::before { background-color: var(--danger); }
+        .warning-group .audit-item-detail::before { background-color: var(--warning); }
+
+
+        /* TAB 2: Chatbot Layout */
+        .chatbot-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 150px);
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(15px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chat-bubble {
+            max-width: 75%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            animation: bubblePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            word-wrap: break-word;
+        }
+
+        .chat-bubble.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .chat-bubble.bot {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-bubble.bot p {
+            margin-bottom: 8px;
+        }
+
+        .chat-bubble.bot p:last-child {
+            margin-bottom: 0;
+        }
+
+        .chat-bubble.bot ul, .chat-bubble.bot ol {
+            margin-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .chat-bubble.bot li {
+            margin-bottom: 4px;
+        }
+
+        .chat-bubble.bot code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Suggestion Chips */
+        .chat-suggestions {
+            padding: 10px 20px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestion-chip {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            font-weight: 500;
+        }
+
+        .suggestion-chip:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--primary);
+            color: var(--text-primary);
+        }
+
+        /* Chat input zone */
+        .chat-input-area {
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-family: var(--font-inter);
+            font-size: 0.95rem;
+            transition: var(--transition-smooth);
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+        }
+
+        .chat-send-btn {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+        }
+
+        .chat-send-btn:hover {
+            transform: translateY(-1px);
+            background: var(--accent-gradient-hover);
+            box-shadow: 0 6px 14px rgba(99, 102, 241, 0.25);
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+
+        /* Global Processing Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(4, 5, 8, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.05);
+            border-top: 4px solid var(--primary);
+            border-right: 4px solid var(--secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .overlay p {
+            font-family: var(--font-outfit);
+            font-weight: 500;
+            font-size: 1.15rem;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        .overlay span {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bubblePop {
+            from { opacity: 0; transform: scale(0.9) translateY(5px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Scrollbars Customization */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Glowing Graphics -->
+    <div class="bg-glow-1"></div>
+    <div class="bg-glow-2"></div>
+
+    <!-- GLOBAL LOADER OVERLAY -->
+    <div id="loader-overlay" class="overlay">
+        <div class="spinner"></div>
+        <p id="loader-title">Processing</p>
+        <span id="loader-subtitle">Parsing PDF contents and computing AI vectors...</span>
+    </div>
+
+    <!-- AUTHENTICATION CONTAINER (LOGIN / REGISTRATION) -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1 id="auth-title">Resume AI</h1>
+                <p id="auth-subtitle">Analyze, Audit & Conversational RAG</p>
+            </div>
+            
+            <div id="auth-error" class="error-message"></div>
+
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" class="form-control" placeholder="Enter username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Enter password" required>
+                </div>
+                
+                <button type="submit" id="auth-submit-btn" class="btn">Sign In</button>
+            </form>
+
+            <div class="auth-toggle">
+                <span id="auth-toggle-text">Don't have an account?</span>
+                <a id="auth-toggle-link" onclick="toggleAuthMode()">Sign Up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD WINDOW (Only displayed after logged in) -->
+    <div id="dashboard-container" class="dashboard-container">
+        <!-- Top navbar -->
+        <header class="top-navbar">
+            <div class="brand">
+                <h2>AI Resume Analyzer & RAG</h2>
+            </div>
+            <div class="user-profile">
+                <span id="username-display" class="username-badge">Guest</span>
+                <button class="logout-btn" onclick="handleLogout()">Log Out</button>
+            </div>
+        </header>
+
+        <!-- Main workspace containing sidebar and main panel -->
+        <main class="workspace">
+            <!-- Sidebar list and upload zone -->
+            <aside class="sidebar">
+                <!-- Resume File Upload Zone -->
+                <div class="upload-section">
+                    <h3>Upload Resume</h3>
+                    <div class="dropzone" id="dropzone" onclick="triggerFileSelect()">
+                        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"></path>
+                        </svg>
+                        <p>Drag & drop PDF here</p>
+                        <span>or click to browse files</span>
+                        <input type="file" id="file-input" style="display: none;" accept=".pdf" onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+
+                <!-- List of Uploaded Resumes -->
+                <div class="resumes-list-section">
+                    <h3>Your Resumes</h3>
+                    <div id="resume-items-container" class="resume-items-container">
+                        <!-- Dynamic items added here -->
+                        <div class="empty-resumes">No resumes uploaded yet. Upload a PDF to start!</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Panel -->
+            <section class="main-panel">
+                <!-- Case: No resume selected -->
+                <div id="no-selection-panel" class="no-selection-panel">
+                    <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                    </svg>
+                    <h2>Start Analysis</h2>
+                    <p>Select an uploaded resume from the left sidebar or drag-and-drop a new PDF to run a full ATS score audit, identify content gaps, and chat about it using RAG vectors.</p>
+                </div>
+
+                <!-- Case: Resume selected workspace -->
+                <div id="selected-workspace" class="selected-workspace">
+                    <!-- Tab headers navigation bar -->
+                    <div class="workspace-header">
+                        <div class="active-resume-title">
+                            <h3 id="active-resume-name">Resume_Name.pdf</h3>
+                        </div>
+                        <nav class="tabs-nav">
+                            <button class="tab-btn active" onclick="switchTab('ats-tab', event)">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ATS Audit
+                            </button>
+                            <button class="tab-btn" onclick="switchTab('chat-tab', event)">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                Resume Chatbot
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- TAB 1: ATS Audit Panel -->
+                    <div id="ats-tab" class="tab-content active">
+                        <div class="ats-audit-grid">
+                            <!-- Left: Score circle -->
+                            <div class="score-card">
+                                <h4>ATS Rating</h4>
+                                <div class="gauge-container">
+                                    <svg class="gauge-svg" viewBox="0 0 180 180">
+                                        <defs>
+                                            <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stop-color="#6366f1" />
+                                                <stop offset="100%" stop-color="#06b6d4" />
+                                            </linearGradient>
+                                        </defs>
+                                        <circle class="gauge-bg" cx="90" cy="90" r="80"></circle>
+                                        <circle id="gauge-fill" class="gauge-fill" cx="90" cy="90" r="80"></circle>
+                                    </svg>
+                                    <div class="gauge-text">
+                                        <span id="score-val" class="gauge-val">0</span>
+                                        <span class="gauge-label">Score</span>
+                                    </div>
+                                </div>
+                                <div id="score-status" class="score-status" style="color: var(--success);">Optimal Profile</div>
+                            </div>
+
+                            <!-- Right: Strengths, issues, paths, and changes -->
+                            <div class="feedback-container">
+                                <!-- Careers list -->
+                                <div class="career-card">
+                                    <h4>
+                                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Recommended Career Roles
+                                    </h4>
+                                    <ul id="career-paths" class="career-list">
+                                        <!-- Dynamic tags -->
+                                    </ul>
+                                </div>
+
+                                <!-- Feedback Grid -->
+                                <div class="feedback-sections">
+                                    <!-- Strengths -->
+                                    <div class="audit-group success-group">
+                                        <h4>
+                                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                            </svg>
+                                            Key Strengths
+                                        </h4>
+                                        <ul id="audit-strengths" class="audit-items">
+                                            <!-- Dynamic items -->
+                                        </ul>
+                                    </div>
+
+                                    <!-- Issues -->
+                                    <div class="audit-group danger-group">
+                                        <h4>
+                                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                            </svg>
+                                            Identified Issues
+                                        </h4>
+                                        <ul id="audit-issues" class="audit-items">
+                                            <!-- Dynamic items -->
+                                        </ul>
+                                    </div>
+
+                                    <!-- Actionable improvements -->
+                                    <div class="audit-group warning-group full-width-section">
+                                        <h4>
+                                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                            </svg>
+                                            Suggested Changes & Optimizations
+                                        </h4>
+                                        <ul id="audit-changes" class="audit-items">
+                                            <!-- Dynamic items -->
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: Chatbot Panel -->
+                    <div id="chat-tab" class="tab-content">
+                        <div class="chatbot-container">
+                            <!-- Messages display log -->
+                            <div id="chat-messages" class="chat-messages">
+                                <div class="chat-bubble bot">
+                                    Hello! I have fully mapped your resume sections into AI vectors. You can ask me questions about your experience, projects, tools, or ask for targeted resume adjustments!
+                                </div>
+                            </div>
+                            
+                            <!-- Suggestion quick chips -->
+                            <div class="chat-suggestions">
+                                <div class="suggestion-chip" onclick="submitQuickQuestion('What career options or roles best fit my profile?')">What career fits me?</div>
+                                <div class="suggestion-chip" onclick="submitQuickQuestion('What technical skills are explicitly listed in my resume?')">Technical skills?</div>
+                                <div class="suggestion-chip" onclick="submitQuickQuestion('Suggest improvements for the project descriptions to sound more impactful.')">Improve project impacts</div>
+                                <div class="suggestion-chip" onclick="submitQuickQuestion('Are there any formatting gaps that could cause ATS reading issues?')">ATS formatting gaps?</div>
+                            </div>
+
+                            <!-- User input field -->
+                            <div class="chat-input-area">
+                                <input type="text" id="chat-input" class="chat-input" placeholder="Ask a question on your resume..." onkeydown="handleChatKey(event)">
+                                <button class="chat-send-btn" onclick="sendChatMessage()">
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Frontend Core Application Script -->
+    <script>
+        // State Variables
+        let isSignUpMode = false;
+        let token = localStorage.getItem('auth_token') || '';
+        let currentUser = null;
+        let userResumes = [];
+        let selectedResumeId = null;
+
+        // Backend URL config (local self-reference is default)
+        const API_BASE = '/api';
+
+        // Initialize App on DOM Content Load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                checkAuthAndLoadDashboard();
+            } else {
+                showAuthScreen();
+            }
+            
+            // Drag and drop events setup
+            const dragZone = document.getElementById('dropzone');
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dragZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dragZone.style.borderColor = 'var(--primary)';
+                    dragZone.style.background = 'rgba(99, 102, 241, 0.06)';
+                }, false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dragZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dragZone.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                    dragZone.style.background = 'rgba(255, 255, 255, 0.01)';
+                }, false);
+            });
+            dragZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0 && files[0].type === "application/pdf") {
+                    uploadResumeFile(files[0]);
+                } else {
+                    alert("Only PDF files are supported!");
+                }
+            });
+        });
+
+        // ------------------ VIEW MANAGEMENT ------------------
+        
+        function showAuthScreen() {
+            document.getElementById('auth-container').style.display = 'flex';
+            document.getElementById('dashboard-container').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('dashboard-container').style.display = 'flex';
+            document.getElementById('username-display').textContent = currentUser ? currentUser.username : 'User';
+        }
+
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            const title = document.getElementById('auth-title');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const toggleText = document.getElementById('auth-toggle-text');
+            const toggleLink = document.getElementById('auth-toggle-link');
+            
+            if (isSignUpMode) {
+                title.textContent = "Sign Up";
+                submitBtn.textContent = "Register";
+                toggleText.textContent = "Already have an account?";
+                toggleLink.textContent = "Sign In";
+            } else {
+                title.textContent = "Resume AI";
+                submitBtn.textContent = "Sign In";
+                toggleText.textContent = "Don't have an account?";
+                toggleLink.textContent = "Sign Up";
+            }
+            document.getElementById('auth-error').style.display = 'none';
+        }
+
+        function showLoader(title, subtitle) {
+            document.getElementById('loader-title').textContent = title || 'Processing';
+            document.getElementById('loader-subtitle').textContent = subtitle || 'Please wait...';
+            document.getElementById('loader-overlay').style.display = 'flex';
+        }
+
+        function hideLoader() {
+            document.getElementById('loader-overlay').style.display = 'none';
+        }
+
+        // ------------------ API AUTH OPERATIONS ------------------
+
+        async function handleAuthSubmit(event) {
+            event.preventDefault();
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value.trim();
+            const errorDiv = document.getElementById('auth-error');
+            
+            errorDiv.style.display = 'none';
+            
+            if (!usernameInput || !passwordInput) {
+                errorDiv.textContent = "Please fill in all fields.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const endpoint = isSignUpMode ? '/auth/register' : '/auth/login';
+            showLoader(isSignUpMode ? 'Registering Account' : 'Logging In', 'Authenticating secure session...');
+
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Authentication failed');
+                }
+
+                token = data.access_token;
+                localStorage.setItem('auth_token', token);
+                await checkAuthAndLoadDashboard();
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function checkAuthAndLoadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Session invalid');
+                }
+                
+                currentUser = await response.json();
+                showDashboard();
+                loadUserResumes();
+            } catch (err) {
+                // Session expired or invalid
+                handleLogout();
+            }
+        }
+
+        function handleLogout() {
+            token = '';
+            currentUser = null;
+            selectedResumeId = null;
+            userResumes = [];
+            localStorage.removeItem('auth_token');
+            showAuthScreen();
+            
+            // Clean dynamic text
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('auth-error').style.display = 'none';
+        }
+
+        // ------------------ RESUME MANAGEMENT ------------------
+
+        async function loadUserResumes() {
+            try {
+                const response = await fetch(`${API_BASE}/resumes`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Could not retrieve resumes');
+                userResumes = await response.json();
+                renderResumesList();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderResumesList() {
+            const container = document.getElementById('resume-items-container');
+            if (userResumes.length === 0) {
+                container.innerHTML = '<div class="empty-resumes">No resumes uploaded yet. Upload a PDF to start!</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            userResumes.forEach(res => {
+                const isActive = res.id === selectedResumeId;
+                
+                // Color badge classification
+                let badgeClass = 'success';
+                if (res.ats_score < 50) badgeClass = 'danger';
+                else if (res.ats_score < 75) badgeClass = 'warning';
+
+                const item = document.createElement('div');
+                item.className = `resume-item ${isActive ? 'active' : ''}`;
+                item.onclick = () => selectResume(res.id);
+                
+                // Parse date
+                const dateStr = new Date(res.upload_date).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: '2-digit'
+                });
+
+                item.innerHTML = `
+                    <div class="resume-item-details">
+                        <div class="resume-item-icon">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="resume-info">
+                            <div class="resume-name" title="${res.filename}">${res.filename}</div>
+                            <div class="resume-meta">${dateStr}</div>
+                        </div>
+                    </div>
+                    <div class="resume-badge ${badgeClass}">${res.ats_score}</div>
+                    <button class="delete-resume-btn" onclick="handleDeleteResume(event, ${res.id})" title="Delete Resume">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function triggerFileSelect() {
+            document.getElementById('file-input').click();
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                uploadResumeFile(files[0]);
+            }
+        }
+
+        async function uploadResumeFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            showLoader('Analyzing Resume', 'Parsing PDF text structure, generating semantic embeddings, and auditing career details...');
+
+            try {
+                const response = await fetch(`${API_BASE}/resumes/upload`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Upload and indexing failed');
+                }
+
+                selectedResumeId = data.id;
+                await loadUserResumes();
+                renderResumeWorkspace(data);
+            } catch (err) {
+                alert("Error analyzing resume: " + err.message);
+            } finally {
+                hideLoader();
+                // Clear file input reset
+                document.getElementById('file-input').value = '';
+            }
+        }
+
+        async function handleDeleteResume(event, id) {
+            event.stopPropagation(); // Avoid selecting item on delete click
+            
+            if (!confirm("Are you sure you want to delete this resume? This will clear its vectors in Pinecone and delete local logs.")) {
+                return;
+            }
+
+            showLoader('Deleting vectors', 'Clearing vectorized chunks from Pinecone vector databases...');
+            try {
+                const response = await fetch(`${API_BASE}/resumes/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Could not delete resume');
+
+                if (selectedResumeId === id) {
+                    selectedResumeId = null;
+                    document.getElementById('selected-workspace').style.display = 'none';
+                    document.getElementById('no-selection-panel').style.display = 'flex';
+                }
+                
+                await loadUserResumes();
+            } catch (err) {
+                alert("Delete failed: " + err.message);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function selectResume(id) {
+            selectedResumeId = id;
+            renderResumesList(); // Update active selection styling
+            
+            showLoader('Loading Dashboard', 'Fetching cached resume analysis reports...');
+            try {
+                const response = await fetch(`${API_BASE}/resumes/${id}/analysis`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load analysis details');
+                
+                const data = await response.json();
+                renderResumeWorkspace(data);
+            } catch (err) {
+                alert("Failed to load details: " + err.message);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // ------------------ WORKSPACE / DASHBOARD RENDERING ------------------
+
+        function renderResumeWorkspace(resumeData) {
+            document.getElementById('no-selection-panel').style.display = 'none';
+            const workspace = document.getElementById('selected-workspace');
+            workspace.style.display = 'flex';
+            
+            // Set resume title
+            document.getElementById('active-resume-name').textContent = resumeData.filename;
+
+            // Render ATS circular gauge score
+            const score = resumeData.ats_score || 0;
+            animateScoreGauge(score);
+            
+            // Render text rating category description
+            const statusEl = document.getElementById('score-status');
+            statusEl.textContent = getScoreCategoryText(score);
+            statusEl.style.color = getScoreColor(score);
+
+            // Clean previous lists
+            const careersList = document.getElementById('career-paths');
+            const strengthsList = document.getElementById('audit-strengths');
+            const issuesList = document.getElementById('audit-issues');
+            const changesList = document.getElementById('audit-changes');
+            
+            careersList.innerHTML = '';
+            strengthsList.innerHTML = '';
+            issuesList.innerHTML = '';
+            changesList.innerHTML = '';
+
+            const audit = resumeData.analysis || {};
+            
+            // Render Recommended Careers
+            const paths = audit.career_paths || ["Technical Professional"];
+            paths.forEach(p => {
+                const li = document.createElement('li');
+                li.className = 'career-item';
+                li.textContent = p;
+                careersList.appendChild(li);
+            });
+
+            // Render Key Strengths
+            const strengths = audit.strengths || ["Raw text loaded successfully"];
+            strengths.forEach(s => {
+                const li = document.createElement('li');
+                li.className = 'audit-item-detail';
+                li.textContent = s;
+                strengthsList.appendChild(li);
+            });
+
+            // Render Identified Issues
+            const issues = audit.issues || ["No structural issues analyzed"];
+            issues.forEach(i => {
+                const li = document.createElement('li');
+                li.className = 'audit-item-detail';
+                li.textContent = i;
+                issuesList.appendChild(li);
+            });
+
+            // Render Suggested Changes
+            const changes = audit.changes || ["No suggestions found"];
+            changes.forEach(c => {
+                const li = document.createElement('li');
+                li.className = 'audit-item-detail';
+                li.textContent = c;
+                changesList.appendChild(li);
+            });
+
+            // Reset chatbot screen for this resume
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = `
+                <div class="chat-bubble bot">
+                    Hello! I have fully mapped the sections of <strong>${resumeData.filename}</strong> into AI vectors. You can ask me questions about this candidate's credentials, experience, project impacts, or ask how to optimize specific roles!
+                </div>
+            `;
+            
+            // Switch tabs to ATS Audit by default
+            switchTab('ats-tab');
+        }
+
+        // Circular dynamic gauge utility
+        function animateScoreGauge(targetScore) {
+            const fill = document.getElementById('gauge-fill');
+            const textVal = document.getElementById('score-val');
+            
+            // Map score (0-100) to dashoffset (502 to 0)
+            const circumference = 502;
+            const offset = circumference - (targetScore / 100) * circumference;
+            
+            // Set dashoffset animation
+            fill.style.strokeDashoffset = offset;
+            
+            // Animate text counter
+            let start = 0;
+            const duration = 1500;
+            const stepTime = 15;
+            const steps = duration / stepTime;
+            const increment = targetScore / steps;
+            
+            const timer = setInterval(() => {
+                start += increment;
+                if (start >= targetScore) {
+                    textVal.textContent = targetScore;
+                    clearInterval(timer);
+                } else {
+                    textVal.textContent = Math.floor(start);
+                }
+            }, stepTime);
+        }
+
+        function getScoreCategoryText(score) {
+            if (score >= 85) return "Optimal Compatibility";
+            if (score >= 70) return "Strong Match";
+            if (score >= 50) return "Needs Alignment";
+            return "Critical Revisions Required";
+        }
+
+        function getScoreColor(score) {
+            if (score >= 85) return 'var(--success)';
+            if (score >= 70) return 'var(--warning)';
+            return 'var(--danger)';
+        }
+
+        function switchTab(tabId, event) {
+            // Hide all tab panels
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Remove active from tab buttons
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Show target panel
+            document.getElementById(tabId).classList.add('active');
+            
+            // Highlight button
+            if (event) {
+                event.currentTarget.classList.add('active');
+            } else {
+                // Find tab button by action and activate
+                const index = tabId === 'ats-tab' ? 0 : 1;
+                document.querySelectorAll('.tab-btn')[index].classList.add('active');
+            }
+        }
+
+        // ------------------ CHATBOT INTERACTION ------------------
+
+        function handleChatKey(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question || !selectedResumeId) return;
+
+            // Clear input field
+            input.value = '';
+
+            // Render User bubble
+            appendChatBubble(question, 'user');
+
+            // Render Typing spinner indicator
+            const typingIndicator = showTypingIndicator();
+
+            try {
+                const response = await fetch(`${API_BASE}/resumes/${selectedResumeId}/chat`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                typingIndicator.remove(); // Remove typing spinner
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Chatbot failure');
+                }
+
+                // Render Bot bubble response
+                appendChatBubble(data.answer, 'bot');
+            } catch (err) {
+                typingIndicator.remove();
+                appendChatBubble(`Error: ${err.message}`, 'bot');
+            }
+        }
+
+        function submitQuickQuestion(questionText) {
+            document.getElementById('chat-input').value = questionText;
+            sendChatMessage();
+        }
+
+        function appendChatBubble(text, sender) {
+            const container = document.getElementById('chat-messages');
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${sender}`;
+            
+            if (sender === 'bot') {
+                // Simple markdown parse for formatting
+                bubble.innerHTML = formatMarkdownText(text);
+            } else {
+                bubble.textContent = text;
+            }
+            
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const container = document.getElementById('chat-messages');
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            container.appendChild(indicator);
+            container.scrollTop = container.scrollHeight;
+            return indicator;
+        }
+
+        function formatMarkdownText(text) {
+            // Helper function to format bold sentences and bullet lists
+            let html = text
+                .replace(/\n\s*-\s+(.*)/g, '<li>$1</li>') // convert dash lists to <li>
+                .replace(/\n\s*\*\s+(.*)/g, '<li>$1</li>') // convert star lists to <li>
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>') // wrap <li> groups in <ul>
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // bold text
+                .replace(/`(.*?)`/g, '<code>$1</code>') // code tags
+                .replace(/\n\n/g, '<p></p>') // paragraphs
+                .replace(/\n/g, '<br>'); // line breaks
+            
+            // Clean up nesting lists issues
+            html = html.replace(/<\/ul>\s*<ul>/g, ''); 
+            return html;
+        }
+    </script>
+</body>
+</html>

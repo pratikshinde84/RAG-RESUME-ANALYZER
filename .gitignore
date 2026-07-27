@@ -1,0 +1,25 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# SQLite database
+resume_analyzer.db
+
+# VS Code settings and workspace files
+.vscode/
+
+# Logs
+*.log
+
+# Temporary files
+*.swp
+*.swo
+.DS_Store
