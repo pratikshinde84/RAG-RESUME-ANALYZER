@@ -2,6 +2,10 @@ import os
 import io
 import json
 import hashlib
+import math
+import re
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from typing import Optional, List, Any, cast
 
@@ -18,11 +22,148 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from pypdf import PdfReader
 from pinecone import Pinecone, ServerlessSpec
-import google.generativeai as genai  # type: ignore
 import jwt
 
 # Load environment variables
 load_dotenv()
+
+
+def is_google_api_key(api_key: str) -> bool:
+    return bool(api_key and api_key.startswith("AQ."))
+
+
+def call_openai_api(payload: dict, endpoint: str = "/chat/completions") -> dict:
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    api_key = google_api_key or openai_api_key
+    if not api_key or api_key.startswith("your_"):
+        raise RuntimeError("API key is not configured. Set OPENAI_API_KEY or GOOGLE_API_KEY in the .env file.")
+
+    use_google = bool(google_api_key) or is_google_api_key(api_key)
+    if use_google:
+        model = payload.get("model")
+        if endpoint == "/embeddings":
+            texts = payload.get("input", [])
+            if isinstance(texts, str):
+                texts = [texts]
+            response_data = []
+            for text in texts:
+                google_request = urllib.request.Request(
+                    url=f"https://generativelanguage.googleapis.com/v1beta2/models/{model}:embedText?key={api_key}",
+                    data=json.dumps({"text": text}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    with urllib.request.urlopen(google_request, timeout=60) as response:
+                        result = json.loads(response.read().decode("utf-8"))
+                        embedding = result.get("embedding")
+                        if embedding is None:
+                            raise RuntimeError("Google embedding response did not include an embedding.")
+                        response_data.append({"embedding": embedding})
+                except urllib.error.HTTPError as exc:
+                    body = exc.read().decode("utf-8", errors="ignore")
+                    raise RuntimeError(f"Google API request failed: {exc.code} {body}") from exc
+                except urllib.error.URLError as exc:
+                    raise RuntimeError(f"Google API request failed: {exc.reason}") from exc
+            return {"data": response_data}
+
+        messages = payload.get("messages", [])
+        prompt_parts = []
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content", "")
+            if role == "system":
+                prompt_parts.append(content)
+            elif role == "user":
+                prompt_parts.append(content)
+            else:
+                prompt_parts.append(content)
+        prompt_text = "\n\n".join(prompt_parts)
+        temperature = payload.get("temperature", 0.2)
+        google_request = urllib.request.Request(
+            url=f"https://generativelanguage.googleapis.com/v1beta2/models/{model}:generateText?key={api_key}",
+            data=json.dumps({
+                "prompt": {"text": prompt_text},
+                "temperature": temperature,
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(google_request, timeout=60) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                candidates = result.get("candidates", [])
+                if not candidates:
+                    raise RuntimeError("Google model did not return any candidates.")
+                output = candidates[0].get("output") or candidates[0].get("content")
+                return {"choices": [{"message": {"content": output}}]}
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"Google API request failed: {exc.code} {body}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Google API request failed: {exc.reason}") from exc
+
+    request = urllib.request.Request(
+        url=f"https://api.openai.com/v1{endpoint}",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"OpenAI API request failed: {exc.code} {body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"OpenAI API request failed: {exc.reason}") from exc
+
+
+def generate_embeddings(texts: List[str]) -> List[List[float]]:
+    dimension = int(os.getenv("PINECONE_INDEX_DIMENSION", str(PINECONE_INDEX_DIMENSION)))
+    if isinstance(texts, str):
+        texts = [texts]
+
+    try:
+        response = call_openai_api(
+            {
+                "model": os.getenv("OPENAI_EMBEDDING_MODEL", OPENAI_EMBEDDING_MODEL),
+                "input": texts,
+            },
+            "/embeddings",
+        )
+        data_items = response.get("data", [])
+        embeddings = [item.get("embedding", []) for item in data_items]
+        if len(embeddings) != len(texts):
+            raise RuntimeError("OpenAI embedding response did not match the requested count.")
+        return embeddings
+    except Exception as exc:
+        print(f"OpenAI embeddings unavailable, using local fallback: {exc}")
+        return [fallback_embedding(text, dimension) for text in texts]
+
+
+def fallback_embedding(text: str, dimension: int) -> List[float]:
+    if not text or not text.strip():
+        return [0.0] * dimension
+
+    tokens = re.findall(r"\w+", text.lower())
+    vector = [0.0] * dimension
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:2], "big") % dimension
+        value = ((int.from_bytes(digest[2:4], "big") % 2001) - 1000) / 1000.0
+        vector[index] += value
+
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return [0.0] * dimension
+    return [value / norm for value in vector]
+
 
 # Initialize FastAPI App
 app = FastAPI(title="AI Resume Analyzer API")
@@ -75,10 +216,10 @@ def get_db():
 JWT_SECRET = os.getenv("JWT_SECRET", "supersecretjwtkey123!@#change_me")
 JWT_ALGORITHM = "HS256"
 
-# Gemini model configuration (can be overridden in .env)
-GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash"))
-GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-2")
-PINECONE_INDEX_DIMENSION = int(os.getenv("PINECONE_INDEX_DIMENSION", "768"))
+# OpenAI / Gemini model configuration (can be overridden in .env)
+OPENAI_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", os.getenv("OPENAI_MODEL", "gemini-2.5-flash"))
+OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "gemini-embedding-2")
+PINECONE_INDEX_DIMENSION = int(os.getenv("PINECONE_INDEX_DIMENSION", "3072"))
 
 # Pydantic Schemas
 class UserAuth(BaseModel):
@@ -157,31 +298,31 @@ def get_current_user_id(authorization: str = Header(None), db: Session = Depends
 
 # RAG & API Service Setup
 def check_api_keys():
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
     pinecone_key = os.getenv("PINECONE_API_KEY")
     
-    if not gemini_key or gemini_key.startswith("your_"):
+    if not google_key and not openai_key:
         raise HTTPException(
             status_code=400, 
-            detail="Gemini API Key is not configured. Please enter a valid GEMINI_API_KEY in the .env file."
+            detail="API key is not configured. Please enter a valid OPENAI_API_KEY or GOOGLE_API_KEY in the .env file."
         )
     if not pinecone_key or pinecone_key.startswith("your_"):
         raise HTTPException(
             status_code=400, 
             detail="Pinecone API Key is not configured. Please enter a valid PINECONE_API_KEY in the .env file."
         )
-    # Optional: ensure models are configured
-    text_model = os.getenv("GEMINI_TEXT_MODEL", GEMINI_TEXT_MODEL)
-    embed_model = os.getenv("GEMINI_EMBEDDING_MODEL", GEMINI_EMBEDDING_MODEL)
+    text_model = os.getenv("OPENAI_TEXT_MODEL", os.getenv("OPENAI_MODEL", OPENAI_TEXT_MODEL))
+    embed_model = os.getenv("OPENAI_EMBEDDING_MODEL", OPENAI_EMBEDDING_MODEL)
     if not text_model or text_model.startswith("your_"):
         raise HTTPException(
             status_code=400,
-            detail="Gemini text model is not configured. Please set GEMINI_TEXT_MODEL in .env to a valid model name."
+            detail="Text model is not configured. Please set OPENAI_TEXT_MODEL in .env to a valid model name."
         )
     if not embed_model or embed_model.startswith("your_"):
         raise HTTPException(
             status_code=400,
-            detail="Gemini embedding model is not configured. Please set GEMINI_EMBEDDING_MODEL in .env to a valid model name."
+            detail="Embedding model is not configured. Please set OPENAI_EMBEDDING_MODEL in .env to a valid model name."
         )
 
 # PDF Extraction Utility
@@ -251,38 +392,16 @@ def index_resume_chunks(resume_id: int, user_id: int, chunks: List[str]):
     pc_index = get_or_create_index()
     if not pc_index:
         raise Exception("Failed to access Pinecone index. Check PINECONE_API_KEY or connection.")
-        
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    gen = cast(Any, genai)
-    gen.configure(api_key=gemini_key)
-    
+
     vectors = []
     namespace = f"user_{user_id}_resume_{resume_id}"
     batch_size = 20
-    
+
     for i in range(0, len(chunks), batch_size):
         batch_chunks = chunks[i:i+batch_size]
         try:
-            response = gen.embed_content(
-                model=os.getenv("GEMINI_EMBEDDING_MODEL", GEMINI_EMBEDDING_MODEL),
-                content=batch_chunks,
-                task_type="retrieval_document"
-            )
-            # Normalize possible response shapes
-            if isinstance(response, dict):
-                embeddings = response.get('embeddings') or response.get('embedding') or []
-            else:
-                embeddings = []
-            # If single vector returned, wrap it
-            if embeddings and isinstance(embeddings[0], (float, int)):
-                embeddings = [embeddings]
-            for j, emb_values in enumerate(embeddings):
-                # Normalize embedding results
-                if isinstance(emb_values, dict) and 'values' in emb_values:
-                    values = emb_values['values']
-                else:
-                    values = emb_values
-                    
+            embeddings = generate_embeddings(batch_chunks)
+            for j, values in enumerate(embeddings):
                 chunk_index = i + j
                 vectors.append({
                     "id": f"chunk_{chunk_index}",
@@ -296,7 +415,7 @@ def index_resume_chunks(resume_id: int, user_id: int, chunks: List[str]):
         except Exception as e:
             print(f"Error generating embeddings: {e}")
             raise e
-            
+
     try:
         pc_index.upsert(vectors=vectors, namespace=namespace)
     except Exception as e:
@@ -308,33 +427,13 @@ def query_resume_context(resume_id: int, user_id: int, question: str, top_k: int
     pc_index = get_or_create_index()
     if not pc_index:
         return ""
-        
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    gen = cast(Any, genai)
-    gen.configure(api_key=gemini_key)
-    
+
     try:
-        response = gen.embed_content(
-            model=os.getenv("GEMINI_EMBEDDING_MODEL", GEMINI_EMBEDDING_MODEL),
-            content=question,
-            task_type="retrieval_query"
-        )
-        # Extract single embedding vector
-        if isinstance(response, dict):
-            if 'embedding' in response and isinstance(response['embedding'], list):
-                query_vector = response['embedding']
-            elif 'embeddings' in response and isinstance(response['embeddings'], list):
-                # take first
-                q = response['embeddings'][0]
-                query_vector = q['values'] if isinstance(q, dict) and 'values' in q else q
-            else:
-                query_vector = response.get('embedding', [])
-        else:
-            query_vector = []
+        query_vector = generate_embeddings([question])[0]
     except Exception as e:
         print(f"Error generating query embedding: {e}")
         return ""
-        
+
     namespace = f"user_{user_id}_resume_{resume_id}"
     try:
         query_response = pc_index.query(
@@ -367,16 +466,10 @@ def delete_resume_vectors(resume_id: int, user_id: int):
 
 # Gemini Analysis Logic
 def analyze_resume_text(text: str) -> dict:
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    gen = cast(Any, genai)
-    gen.configure(api_key=gemini_key)
-    
-    model = gen.GenerativeModel(os.getenv("GEMINI_TEXT_MODEL", GEMINI_TEXT_MODEL))
-    
     prompt = f"""
     You are a professional resume writer and ATS (Applicant Tracking System) optimization specialist.
     Analyze the following resume text and provide a comprehensive evaluation.
-    
+
     Provide the response strictly as a JSON object with the following structure:
     {{
         "ats_score": 85,
@@ -400,60 +493,66 @@ def analyze_resume_text(text: str) -> dict:
     }}
 
     Be critical but constructive. Base your evaluation on industry standards for ATS filtering (keywords, structure, project details).
-    
+
     Resume Text:
     {text}
     """
-    
+
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        return json.loads(response.text)
+        response = call_openai_api({
+            "model": os.getenv("OPENAI_TEXT_MODEL", os.getenv("OPENAI_MODEL", OPENAI_TEXT_MODEL)),
+            "messages": [
+                {"role": "system", "content": "You are a helpful ATS and resume analysis assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+        })
+        content = response["choices"][0]["message"]["content"]
+        return json.loads(content)
     except Exception as e:
-        print(f"Error running Gemini analysis: {e}")
+        print(f"Error running analysis: {e}")
         return {
             "ats_score": 50,
             "strengths": ["Loaded raw profile text successfully."],
             "issues": ["Could not perform deep API auditing on formatting."],
-            "changes": ["Ensure your Gemini configuration limits and credit balance are healthy."],
+            "changes": ["Ensure your API configuration and model limits are healthy."],
             "career_paths": ["General Industry Specialist"]
         }
 
 # Gemini RAG QA Logic
 def answer_resume_question(resume_id: int, user_id: int, raw_text: str, question: str) -> str:
     context = query_resume_context(resume_id, user_id, question)
-    
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    gen = cast(Any, genai)
-    gen.configure(api_key=gemini_key)
-    
-    model = gen.GenerativeModel(os.getenv("GEMINI_TEXT_MODEL", GEMINI_TEXT_MODEL))
-    
+
     # Fallback to passing a truncated portion of the raw text if context search yielded nothing
     fallback_text = raw_text[:3000] if raw_text else ""
-    
+
     prompt = f"""
     You are an expert career assistant and AI resume assistant.
     You are helping a candidate evaluate, clarify, or refine details of their experience based on their uploaded resume.
-    
+
     Here is some relevant context from their resume retrieved through semantic search (Pinecone RAG):
     ---
     {context if context.strip() else "No specific snippets matched. Truncated raw resume preview: " + fallback_text}
     ---
-    
+
     Please answer the user's question. If the user asks general questions about career options, how to format things, or how to phrase a bullet point, offer helpful resume-writing tips. If the user asks about facts in the resume (e.g. 'What projects are listed?'), only list the details present in the context.
     Keep the answer clear, professional, and well-formatted.
-    
+
     Question: {question}
     """
-    
+
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        response = call_openai_api({
+            "model": os.getenv("OPENAI_TEXT_MODEL", os.getenv("OPENAI_MODEL", OPENAI_TEXT_MODEL)),
+            "messages": [
+                {"role": "system", "content": "You are a helpful career assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+        })
+        return response["choices"][0]["message"]["content"]
     except Exception as e:
-        return f"Error communicating with Gemini model: {str(e)}"
+        return f"Error communicating with model API: {str(e)}"
 
 # FASTAPI API ENDPOINTS
 
@@ -643,15 +742,16 @@ def home():
 # Startup check log
 @app.on_event("startup")
 def check_configuration():
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
     pinecone_key = os.getenv("PINECONE_API_KEY")
-    
+
     issues = []
-    if not gemini_key or gemini_key.startswith("your_"):
-        issues.append("GEMINI_API_KEY is not defined in your environment/.env")
+    if not google_key and not openai_key:
+        issues.append("OPENAI_API_KEY or GOOGLE_API_KEY is not defined in your environment/.env")
     if not pinecone_key or pinecone_key.startswith("your_"):
         issues.append("PINECONE_API_KEY is not defined in your environment/.env")
-        
+
     if issues:
         print("\n" + "!" * 60)
         print("WARNING: Missing API keys in your configuration:")

@@ -1454,15 +1454,20 @@
             }
         }
 
+        async function handleAuthError(response) {
+            if (response.status === 401) {
+                handleLogout();
+                throw new Error('Session expired or invalid. Please log in again.');
+            }
+            return response;
+        }
+
         async function checkAuthAndLoadDashboard() {
             try {
                 const response = await fetch(`${API_BASE}/auth/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
-                if (!response.ok) {
-                    throw new Error('Session invalid');
-                }
+                await handleAuthError(response);
                 
                 currentUser = await response.json();
                 showDashboard();
@@ -1494,6 +1499,7 @@
                 const response = await fetch(`${API_BASE}/resumes`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                await handleAuthError(response);
                 if (!response.ok) throw new Error('Could not retrieve resumes');
                 userResumes = await response.json();
                 renderResumesList();
@@ -1575,6 +1581,7 @@
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
+                await handleAuthError(response);
 
                 const data = await response.json();
                 if (!response.ok) {
@@ -1606,6 +1613,7 @@
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                await handleAuthError(response);
 
                 if (!response.ok) throw new Error('Could not delete resume');
 
@@ -1632,6 +1640,7 @@
                 const response = await fetch(`${API_BASE}/resumes/${id}/analysis`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                await handleAuthError(response);
                 if (!response.ok) throw new Error('Failed to load analysis details');
                 
                 const data = await response.json();
@@ -1816,6 +1825,7 @@
                     },
                     body: JSON.stringify({ question })
                 });
+                await handleAuthError(response);
 
                 const data = await response.json();
                 typingIndicator.remove(); // Remove typing spinner
